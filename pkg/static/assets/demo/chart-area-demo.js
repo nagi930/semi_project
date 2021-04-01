@@ -1,26 +1,47 @@
 // Set new default font family and font color to mimic Bootstrap's default styling
 Chart.defaults.global.defaultFontFamily = '-apple-system,system-ui,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif';
 Chart.defaults.global.defaultFontColor = '#292b2c';
+Chart.defaults.global.defaultFontSize = 17;
+
 
 // Area Chart Example
+
+
+var myLineChart = null;
+
+function createChart(labels, data, close){
+if(myLineChart) {
+    myLineChart.destroy();
+}
+
 var ctx = document.getElementById("myAreaChart");
-var myLineChart = new Chart(ctx, {
-  type: 'line',
+  myLineChart = new Chart(ctx, {
+  type: 'bar',
   data: {
-    labels: ["Mar 1", "Mar 2", "Mar 3", "Mar 4", "Mar 5", "Mar 6", "Mar 7", "Mar 8", "Mar 9", "Mar 10", "Mar 11", "Mar 12", "Mar 13"],
+    labels: labels,
     datasets: [{
-      label: "Sessions",
-      lineTension: 0.3,
-      backgroundColor: "rgba(2,117,216,0.2)",
-      borderColor: "rgba(2,117,216,1)",
+      type: 'bar',
+      label: "keyword count",
+      yAxisID: 'A',
+      backgroundColor: "rgba(100,200,100,0.5)",
+      borderColor: "rgba(100,200,100,0.5)",
+      data: data,
+    },
+    {
+    type: 'line',
+    label: "price",
+    yAxisID: 'B',
+      lineTension: 0,
+      backgroundColor: "rgba(208, 49, 0, 0)",
+      borderColor: "rgba(244, 87, 0, 1)",
       pointRadius: 5,
-      pointBackgroundColor: "rgba(2,117,216,1)",
+      pointBackgroundColor: "rgba(255, 32, 0, 1)",
       pointBorderColor: "rgba(255,255,255,0.8)",
       pointHoverRadius: 5,
-      pointHoverBackgroundColor: "rgba(2,117,216,1)",
+      pointHoverBackgroundColor: "rgba(255, 32, 0, 1)",
       pointHitRadius: 50,
       pointBorderWidth: 2,
-      data: data,
+      data: close,
     }],
   },
   options: {
@@ -37,9 +58,32 @@ var myLineChart = new Chart(ctx, {
         }
       }],
       yAxes: [{
+        id: 'A',
+        type: 'linear',
+        position: 'left',
+        scaleLabel: {
+          display: true,
+          labelString: 'count'
+        },
         ticks: {
           min: 0,
-          max: 40000,
+          max: 200,
+          maxTicksLimit: 5
+        },
+        gridLines: {
+          color: "rgba(0, 0, 0, 0)",
+        }
+      }, {
+        id: 'B',
+        type: 'linear',
+        position: 'right',
+        scaleLabel: {
+          display: true,
+          labelString: 'price'
+        },
+        ticks: {
+          min: min_,
+          max: max_,
           maxTicksLimit: 5
         },
         gridLines: {
@@ -48,7 +92,29 @@ var myLineChart = new Chart(ctx, {
       }],
     },
     legend: {
-      display: false
-    }
-  }
+      display: true
+    },
+//    animation: {
+//    onComplete: function () {
+//      var chartInstance = this.chart,
+//        ctx = chartInstance.ctx;
+//        ctx.font = Chart.helpers.fontString(Chart.defaults.global.defaultFontSize, Chart.defaults.global.defaultFontStyle, Chart.defaults.global.defaultFontFamily);
+//        ctx.textAlign = 'center';
+//        ctx.textBaseline = 'bottom';
+//
+//        this.data.datasets.forEach(function (dataset, i) {
+//          var meta = chartInstance.controller.getDatasetMeta(i);
+//          meta.data.forEach(function (bar, index) {
+//            var data = dataset.data[index];
+//            ctx.fillText(data, bar._model.x, bar._model.y - 5);
+//          });
+//        });
+//    }
+//    }
+  },
 });
+
+
+}
+
+

@@ -7,7 +7,6 @@ from bs4 import BeautifulSoup
 import pymysql
 
 
-
 class InvestingCrawler:
     HEADERS = {"User-Agent":'Mozilla/5.0'}
     BASE = 'https://kr.investing.com/news/economy'
@@ -34,7 +33,7 @@ class InvestingCrawler:
 
     def __enter__(self):
         self.cur = self.connect.cursor()
-        InvestingCrawler.COMPLETED = open('./completed.txt', 'r+')
+        InvestingCrawler.COMPLETED = open('./crawl_completed.txt', 'r+')
         InvestingCrawler.art_nums = InvestingCrawler.COMPLETED.read().split(',')
         return self
 
@@ -42,7 +41,10 @@ class InvestingCrawler:
         self.connect.commit()
         self.cur.close()
         self.connect.close()
-
+        InvestingCrawler.COMPLETED.close()
+        InvestingCrawler.COMPLETED = open('./crawl_completed.txt', 'w+')
+        for at in InvestingCrawler.art_nums:
+            InvestingCrawler.COMPLETED.write(f'{at},')
         InvestingCrawler.COMPLETED.close()
 
     def create_dt(self):
@@ -51,17 +53,17 @@ class InvestingCrawler:
         self.cur.execute(f'''
         CREATE TABLE IF NOT EXISTS {self.table} (
         article_id INT NOT NULL PRIMARY KEY,
-        article_title VARCHAR(50),
+        article_title VARCHAR(100),
         article_publish VARCHAR(20),
         article_date DATETIME,
         article_content LONGTEXT);
         ''')
 
-    def start(self, start=1, end=2):
+    def start(self, start=60, end=65):
         self.create_dt()
         self.crawl_(start, end)
 
-    def crawl_(self, start=1, end=2):
+    def crawl_(self, start=60, end=65):
         for i in range(start, end):
             url = f'{InvestingCrawler.BASE}/{i}'
             res = requests.get(url, headers=InvestingCrawler.HEADERS).text.encode('utf-8')
@@ -70,7 +72,7 @@ class InvestingCrawler:
             temp = soup.find('div', class_='largeTitle')
             articles = temp.find_all('article', class_="js-article-item articleItem ")
             time.sleep(1)
-
+            print(f'now: {i}, total:{end-1}')
             for article in articles:
                 time.sleep(0.5)
                 title = article.find('a', class_='title').text
@@ -82,7 +84,7 @@ class InvestingCrawler:
                     print(f'Already exists article')
                     continue
                 else:
-                    InvestingCrawler.COMPLETED.write(f'{article_num},')
+                    InvestingCrawler.art_nums.append(article_num)
                 publish = article.find('span', class_='articleDetails').contents[0].string
 
                 content_url = InvestingCrawler.BASE + '/article-' + article_num
@@ -90,7 +92,7 @@ class InvestingCrawler:
                 soup = BeautifulSoup(res, 'lxml')
 
                 date = soup.select_one('div.contentSectionDetails > span').string
-                date = re.search(r'\(.*\)', date).group().strip('()')
+                date = re.match(r'\d+년\s\d+월\s\d+일\s\d+\:\d+', date).group()
                 date = date.replace('년 ', '-').replace('월 ', '-').replace('일', '')
                 date = datetime.datetime.strptime(date, '%Y-%m-%d %H:%M')
 
@@ -105,6 +107,7 @@ class InvestingCrawler:
                 INSERT INTO {self.table} (article_id, article_title, article_publish, article_date, article_content)
                 VALUES ("{article_num}", "{title}", "{publish}", "{date}", "{content}")
                 ''')
+            self.connect.commit()
 
 
 

@@ -9,11 +9,11 @@ import pymysql
 from konlpy.tag import Komoran
 
 class Base:
-    def __init__(self, user=None, password=None, database='default_db', table='default_tb'):
+    def __init__(self, user=None, password=None, database=None, table=None):
         self.user = user or None
         self.password = password or None
-        self.database = database
-        self.table = table
+        self.database = database or None
+        self.table = table or None
         self._connect = None
         self.cur = None
 
@@ -43,6 +43,8 @@ class InvestingCrawler(Base):
     BASE = 'https://kr.investing.com/news/economy'
     COMPLETED = None
     ARTICLE_NUMS = None
+    READY_TO_KEYWORD =None
+    CONTINUE_CNT = 0
 
     def __init__(self, user, password, database, table, start, end):
         super().__init__(user, password, database, table)
@@ -53,13 +55,13 @@ class InvestingCrawler(Base):
         super().__enter__()
         InvestingCrawler.COMPLETED = open('./crawl_completed.txt', 'r+')
         InvestingCrawler.ARTICLE_NUMS = InvestingCrawler.COMPLETED.read().split(',')
+        InvestingCrawler.COMPLETED = open('./crawl_completed.txt', 'w+')
+
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        InvestingCrawler.COMPLETED = open('./crawl_completed.txt', 'w+')
-        for at in InvestingCrawler.ARTICLE_NUMS:
-            InvestingCrawler.COMPLETED.write(f'{at},')
         InvestingCrawler.COMPLETED.close()
+        shutil.copy('./crawl_completed.txt', './ready_to_keyword.txt')
         super().__exit__(exc_type, exc_val, exc_tb)
 
     def create_dt(self):
@@ -77,7 +79,11 @@ class InvestingCrawler(Base):
     def crawl_(self, start, end):
         for i in range(start, end+1):
             url = f'{InvestingCrawler.BASE}/{i}'
-            res = requests.get(url, headers=InvestingCrawler.HEADERS).text.encode('utf-8')
+            res = None
+            try:
+                res = requests.get(url, headers=InvestingCrawler.HEADERS).text.encode('utf-8')
+            except requests.exceptions.HTTPError:
+                print("can't connect to url")
 
             soup = BeautifulSoup(res, 'lxml')
             temp = soup.find('div', class_='largeTitle')
@@ -94,13 +100,21 @@ class InvestingCrawler(Base):
                 print(article_num)
                 if article_num in InvestingCrawler.ARTICLE_NUMS:
                     print(f'Already exists article')
+                    InvestingCrawler.CONTINUE_CNT += 1
+                    if InvestingCrawler.CONTINUE_CNT > 2:
+                        print('3 회 중복')
+                        return
                     continue
                 else:
-                    InvestingCrawler.ARTICLE_NUMS.append(article_num)
+                    InvestingCrawler.COMPLETED.write(f'{article_num},')
                 publish = article.find('span', class_='articleDetails').contents[0].string
 
                 content_url = InvestingCrawler.BASE + '/article-' + article_num
-                res = requests.get(content_url, headers=InvestingCrawler.HEADERS).text.encode('utf-8')
+                res = None
+                try:
+                    res = requests.get(content_url, headers=InvestingCrawler.HEADERS).text.encode('utf-8')
+                except requests.exceptions.HTTPError:
+                    print("can't connect to url")
                 soup = BeautifulSoup(res, 'lxml')
 
                 date = soup.select_one('div.contentSectionDetails > span').string
@@ -127,39 +141,57 @@ class InvestingCrawler(Base):
 
 
 class Keyword(Base):
+    PROHIBITED_WORD = ['한경', '사진', '19', '만원', '있다', '미국', '중국', '일본',
+                       '이달', '분기', '오전', '오후', '1월', '한국', '인도네시아',
+                       '2월', '3월', '4월', '5월', '6월',
+                       '7월', '8월', '9월', '10월', '11월', '12월', '기준', '인수', '관리', '해지',
+                       '코리아', '투자', '코스닥', '시장', '거래', '서울', '부총리', '이용한', '보건',
+                       '한국', '주가', '지수', '경기', '가격', '공시', '계약', '매도', '매수',
+                       '사업', '부회장', '이익', '은행', '연합뉴스', '회사', '디지털', '환율',
+                       '그룹', '위원회', '영업', '부동산', '이사', '상장', '주주', '주주총회',
+                       '위원', '모델', '자산', '연구원', '지주', '금리', '마케팅', '자산운용',
+                       '산업', '혁신', '법인', '수익률', '세대', '이사회', '평가', '담보', '부품',
+                       '대형', '본사', '보험', '정기', '글로벌', '가구', '환경', '서비스', '공인',
+                       '대표', '조기', '프로젝트', '구독', '포인트', '로이터', '통신', '브랜드',
+                       '모바일', '구독', '센터', '스마트', '패치', '페이', '케이', '국채', '뉴욕',
+                       '정비', '자본', '기차', '수수료', '디자인', '맥주', '와인', '이해충돌', '주식',
+                       '대부', '플랫폼', '위안', '가치주', '리서치', '친환경', '금융', '시가총액', '순위',
+                       '수소', '섬유', '엔진', '주자', '퓨얼', '연료전지', '대기업']
     def __init__(self, user, password, database, table):
         super().__init__(user, password, database, table)
 
     def __enter__(self):
         super().__enter__()
-        shutil.copy('./crawl_completed.txt', './crawl_completed_copy.txt')
-        self.f = open('./crawl_completed_copy.txt', 'r')
+        self.f = open('ready_to_keyword.txt', 'r')
         self.to_work = self.f.read().split(',')
         self.keyword_completed = open('./keyword_completed.txt', 'r+')
+
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        self.f = open('./crawl_completed_copy.txt', 'w')
-        if self.to_work:
-            self.f.write(','.join(self.to_work))
+        self.f = open('ready_to_keyword.txt', 'w')
         self.f.close()
         self.keyword_completed.close()
+        shutil.copy('./keyword_completed.txt', './crawl_completed.txt')
         super().__exit__(exc_type, exc_val, exc_tb)
 
     def keyword_(self):
         while self.to_work:
-            self.now_working = None
-            while not self.now_working and self.to_work:
-                self.now_working = self.to_work.pop().strip()
+            self.now_working = self.to_work.pop().strip()
             print(self.now_working)
             self.connect.select_db('default_db')
-            self.cur.execute(f'''
-            SELECT article_id, article_content FROM default_tb dt
-            WHERE article_id = {self.now_working};
-            ''')
-            id, content = self.cur.fetchone()
-            # nouns = set(Komoran().nouns(content))
+            try:
+                self.cur.execute(f'''
+                SELECT article_id, article_content FROM default_tb dt
+                WHERE article_id = {self.now_working};
+                ''')
+            except pymysql.err.ProgrammingError:
+                print('작업할 아이템이 없습니다.')
+            if not self.cur.rowcount:
+                continue
+            _, content = self.cur.fetchone()
             content = content.replace('\t', ' ').replace('\n', ' ').strip()
+
             komoran = Komoran(max_heap_size=1024 * 6)
             pos = komoran.pos(content)
             NNP = [string[0] for string in pos if string[1] == 'NNP' and len(string[0]) > 1]
@@ -181,7 +213,7 @@ class Keyword(Base):
 
         for keyword in keywords:
             keyword = keyword.replace('‘', '').replace('“', '')
-            if not keyword or keyword == '한경' or keyword == '사진':
+            if not keyword or keyword in Keyword.PROHIBITED_WORD:
                 continue
             self.cur.execute(f'''
             INSERT IGNORE INTO keyword
@@ -203,10 +235,13 @@ class Keyword(Base):
         self.keyword_completed.write(f'{self.now_working},')
 
 
+
 if __name__ == '__main__':
-    crawl = InvestingCrawler('root', 'qw75718856**', 'default_db', 'default_tb', 23, 70)
-    kw = Keyword('root', 'qw75718856**', 'default_db', 'default_tb')
-    # with crawl as c:
-    #     c.save_data()
+    info = ['root', 'qw75718856**', 'default_db', 'default_tb']
+    crawl = InvestingCrawler(*info, 1, 100)
+    kw = Keyword(*info)
+
+    with crawl as c:
+        c.save_data()
     with kw as k:
         k.keyword_()
