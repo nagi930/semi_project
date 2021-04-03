@@ -1,11 +1,13 @@
 import json
 import datetime
-import random
 
 from flask import Flask, render_template, request
 import pymysql
-import pytagcloud
 import pandas_datareader.data as web
+from wordcloud import WordCloud
+from gensim.models import Word2Vec
+import matplotlib.font_manager as fm
+from matplotlib import rc
 
 app = Flask(__name__, template_folder='templates')
 
@@ -23,14 +25,13 @@ SELECT K.keyword_name 키워드, COUNT(K.keyword_id) 횟수
 FROM default_db.keyword_detail KD, default_db.keyword K, default_db.default_tb DT
 WHERE KD.keyword_id = K.keyword_id
 AND KD.article_id = DT.article_id
-AND DATE(DT.article_date) BETWEEN DATE_ADD(NOW(),INTERVAL -1 WEEK ) AND NOW()
+AND DATE(DT.article_date) BETWEEN DATE_ADD(NOW(),INTERVAL -1 MONTH ) AND NOW()
 GROUP BY KD.keyword_id
 ORDER BY 횟수 DESC
 LIMIT 100;
 ''')
 
 week_hot_keyword = cur.fetchall()
-
 
 cur.execute(f'''
 SELECT K.keyword_name day_keywords, COUNT(K.keyword_id) 횟수
@@ -51,6 +52,24 @@ else:
 day_list, day_count = zip(*day_keywords[:20])
 max_cnt = (max(day_count)//10)*10 + 10
 
+font_name = fm.FontProperties(fname='./static/fonts/NanumBarunpenB.ttf').get_name()
+rc('font', family=font_name)
+
+kws = ['삼성전자', '현대차', '기아', '카카오', '네이버']
+integration_node = []
+integration_edge = []
+loaded_model = Word2Vec.load('trained_model')
+
+for i, kw in enumerate(kws):
+    relation_words = loaded_model.wv.most_similar(kw)
+    relation_words = dict(relation_words)
+    node_dataset = [{'id': idx, 'label': relation_word} for idx, relation_word in enumerate(relation_words, i*11+1)]
+    node_dataset.append({'id': i*11, 'label': kw})
+    integration_node.extend(node_dataset)
+
+    edge_dataset = [{'from': i*11, 'to': idx, 'width': 1} for idx in range(11*i+1, len(node_dataset)+i*11)]
+    integration_edge.extend(edge_dataset)
+
 
 @app.route('/')
 def index():
@@ -61,7 +80,9 @@ def index():
                            week_ago=week_ago.strftime('%Y-%m-%d'),
                            day_list=list(day_list),
                            day_count=list(day_count),
-                           max_cnt=max_cnt)
+                           max_cnt=max_cnt,
+                           node_dataset=integration_node,
+                           edge_dataset=integration_edge)
 
 
 @app.route('/week_keywords')
@@ -87,9 +108,11 @@ def week_keywords():
             f = cur.fetchone()[0]
         count.append(f)
 
-    df = web.DataReader(stock, 'naver', week_ago, now)
+    df = web.DataReader(stock, 'naver', week_ago - datetime.timedelta(days=2), now + datetime.timedelta(days=2))
     df = df.Close.asfreq(freq='D', method='bfill')
     df = df.reset_index()
+    df = df[(df.Date >= week_ago.strftime('%Y-%m-%d')) & (df.Date < now.strftime('%Y-%m-%d'))]
+
     date, close = df.Date.tolist(), df.Close.tolist()
     date = [d.strftime('%Y-%m-%d') for d in date]
     close = [int(c) for c in close]
@@ -101,23 +124,21 @@ def week_keywords():
 
 @app.route('/wordcloud_week')
 def wordcloud_week():
-    r = lambda: random.randint(0,255)
-    color = lambda: (r(), r(), r())
-    week_hot_keyword_ = sorted(week_hot_keyword, key=lambda x: x[1], reverse=True)
-    m = max(list(c for n, c in week_hot_keyword_))
-    tags = [{ 'color': color(), 'tag': n, 'size': int(c/m*300) } for n, c in week_hot_keyword_[:50]]
-    pytagcloud.create_tag_image(tags, './static/assets/img/wordcloud_week.jpg', fontname='NanumBarunpenB', size=(1920, 1080))
+    kw_dictionary = dict((a, b) for a, b in week_hot_keyword)
+    wc = WordCloud(font_path= "./static/fonts/NanumBarunpenB.ttf", width=1920, height=1080, background_color="white")
+    wc = wc.generate_from_frequencies(kw_dictionary)
+    wc.to_file('./static/assets/img/wc_week.jpg')
+
     return render_template('wordcloud_week.html')
 
 
 @app.route('/wordcloud_day')
 def wordcloud_day():
-    r = lambda: random.randint(0,255)
-    color = lambda: (r(), r(), r())
-    day_keywords_ = sorted(day_keywords, key=lambda x: x[1], reverse=True)
-    m = max(list(c for n, c in day_keywords_))
-    tags = [{ 'color': color(), 'tag': n, 'size': int(c/m*200) } for n, c in day_keywords_]
-    pytagcloud.create_tag_image(tags, './static/assets/img/wordcloud_day.jpg', fontname='NanumBarunpenB', size=(1920, 1080))
+    kw_dictionary = dict((a, b) for a, b in day_keywords)
+    wc = WordCloud(font_path= "./static/fonts/NanumBarunpenB.ttf", width=1920, height=1080, background_color="white")
+    wc = wc.generate_from_frequencies(kw_dictionary)
+    wc.to_file('./static/assets/img/wc_day.jpg')
+
     return render_template('wordcloud_day.html')
 
 

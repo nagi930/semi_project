@@ -5,7 +5,7 @@ import datetime
 import requests
 from bs4 import BeautifulSoup
 import pymysql
-from konlpy.tag import Komoran
+
 
 HEADERS = {"User-Agent": 'Mozilla/5.0'}
 BASE_URL = 'https://kr.investing.com/news/economy'
@@ -20,10 +20,11 @@ class CKStorer:
         self.database = database
         self.table = table
         self._connect = None
-        self.cur = None
+        self._cur = None
         self._to_do = None
         self.ing = None
         self.overlap_count = 0
+        self.overlap_limit = 100
 
     @property
     def connect(self):
@@ -31,6 +32,12 @@ class CKStorer:
             self._connect = pymysql.connect(host='localhost', port=3306, user=self.user,
                                             password=self.password, charset='utf8')
         return self._connect
+
+    @property
+    def cur(self):
+        if self._cur is None:
+            self._cur = self.connect.cursor()
+        return self._cur
 
     @property
     def user(self):
@@ -52,7 +59,7 @@ class CKStorer:
 
     def __enter__(self):
         if self.cur is None:
-            self.cur = self.connect.cursor()
+            self._cur = self.connect.cursor()
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -100,9 +107,10 @@ class CKStorer:
             except requests.exceptions.HTTPError as ex:
                 print(ex)
             soup = BeautifulSoup(res, 'lxml')
+
             temp = soup.find('div', class_='largeTitle')
             articles = temp.find_all('article', class_="js-article-item articleItem ")
-
+            print(articles)
             print(f'page: {idx} / {end}')
             for article in articles:
                 time.sleep(0.5)
@@ -115,8 +123,8 @@ class CKStorer:
                 if self.check_overlap('article_id', article_num):
                     print(f'{article_num} already in database')
                     self.overlap_count += 1
-                    if self.overlap_count > 9:
-                        print('기사 중복 10회 발생...')
+                    if self.overlap_count > self.overlap_limit:
+                        print(f'기사 중복 {self.overlap_limit + 1}회 발생...')
                         print('--------------extract keyword--------------')
                         return
                     else:
@@ -170,6 +178,7 @@ class CKStorer:
         if self._to_do is None:
             self.cur.execute('''
             SELECT DISTINCT article_id FROM default_tb
+            WHERE char_length(article_content) > 299;
             ''')
             crawled = self.cur.fetchall()
             crawled = set(x[0] for x in crawled)
@@ -197,15 +206,16 @@ class CKStorer:
             content = self.cur.fetchone()
             content = content[0].replace('\t', ' ').replace('\n', ' ').strip()
 
+            from konlpy.tag import Komoran
+
             komoran = Komoran(max_heap_size=1024 * 6)
             pos = komoran.pos(content)
-            nnp = [string[0] for string in pos if string[1] == 'NNP' and len(string[0]) > 1]
+            pos = [(re.sub(r'[^가-힣a-zA-Z\s]', '', string[0]), string[1]) for string in pos]
+            nnp = [string[0] for string in pos if string[1] == 'NNP' and len(string[0]) > 1
+                                                                     and string[0] not in PROHIBITED_WORDS]
+            nnp = set(nnp)
 
             for keyword in nnp:
-                keyword = keyword.replace('‘', '').replace('“', '')
-                if not keyword or keyword in PROHIBITED_WORDS:
-                    continue
-
                 self.cur.execute(f'''
                 INSERT IGNORE INTO keyword
                 VALUES (NULL, "{keyword}")
@@ -225,8 +235,111 @@ class CKStorer:
                 self.connect.commit()
             print(f'complete {item} {idx+1} / {len(self.to_do)}')
 
+    def relation_keyword(self):
+        import logging
+
+        logging.basicConfig(
+        format='%(asctime)s : %(levelname)s : %(message)s',
+        level=logging.INFO)
+
+        self.connect.select_db('default_db')
+        self.cur.execute('''
+        SELECT DISTINCT TB.article_content
+        FROM default_tb TB, keyword K, keyword_detail KD
+        WHERE TB.article_id = KD.article_id
+        AND K.keyword_id = KD.keyword_id
+        AND char_length(TB.article_content) > 299;
+        ''')
+
+        contents = list(self.cur.fetchall())
+        from konlpy.tag import Komoran
+
+        komoran = Komoran()
+        content_list = []
+
+        for content in contents:
+            pos = komoran.nouns(content[0])
+            nnp = [string for string in pos if len(string) > 1]
+            content_list.append(nnp)
+
+        num_features = 300
+        min_word_count = 7
+        num_workers = 4
+        context = 10
+        downsampling = 1e-3
+
+        from gensim.models import word2vec
+
+        model = word2vec.Word2Vec(content_list,
+                        workers=num_workers,
+                        vector_size=num_features,
+                        min_count=min_word_count,
+                        window=context,
+                        sample=downsampling)
+
+        model.init_sims(replace=True)
+        model_name = 'trained_model'
+        model.save(model_name)
+
+
+        # self.connect.select_db('default_db')
+        # self.cur.execute(f'''
+        # SELECT DISTINCT TB.article_content
+        # FROM default_tb TB, keyword K, keyword_detail KD
+        # WHERE TB.article_id = KD.article_id
+        # AND K.keyword_id = KD.keyword_id
+        # AND K.keyword_name LIKE '%{kw}%';
+        # ''')
+        #
+        # contents = list(self.cur.fetchall())
+        # komoran = Komoran()
+        #
+        # words_list = []
+        #
+        # for content in contents:
+        #     pos = komoran.nouns(content[0])
+        #     nnp = [string for string in pos if len(string) > 1]
+        #     words_list.append(nnp)
+        #
+        # num_features = 300
+        # min_word_count = 5
+        # num_workers = 4
+        # context = 10
+        # sampling = 1e-3
+        #
+        # from gensim.models import word2vec
+        #
+        # model = word2vec.Word2Vec(words_list,
+        #                           workers=num_workers,
+        #                           vector_size=num_features,
+        #                           min_count=min_word_count,
+        #                           window=context,
+        #                           sample=sampling,
+        #                           sg=0)
+        # model.init_sims(replace=True)
+        # model_name = 'cbow_text'
+        # model.save(model_name)
+        #
+        # print('CBOW : ', model.wv.most_similar(kw))
+        #
+        # return model
+
+        # model = word2vec.Word2Vec(words_list,
+        #                           workers=num_workers,
+        #                           vector_size=num_features,
+        #                           min_count=min_word_count,
+        #                           window=context,
+        #                           sample=sampling,
+        #                           sg=1)
+        # model.init_sims(replace=True)
+        # model_name = 'skip_gram_text'
+        # model.save(model_name)
+        #
+        # print('Skip-gram : ', model.wv.most_similar(kw))
 
 if __name__ == '__main__':
     test = CKStorer()
     with test as t:
-        t.run(1, 3)
+        t.run(1, 100)
+
+    # test.relation_keyword()
