@@ -64,13 +64,13 @@
                         Dashboard
                     </a>
                     <div class="sb-sidenav-menu-heading">WORDCLOUD</div>
+                    <a class="nav-link" href="/wordcloud_month">
+                        <div class="sb-nav-link-icon"><i class="fas fa-tachometer-alt"></i></div>
+                        wordcloud(month)
+                    </a>
                     <a class="nav-link" href="/wordcloud_week">
                         <div class="sb-nav-link-icon"><i class="fas fa-tachometer-alt"></i></div>
                         wordcloud(week)
-                    </a>
-                    <a class="nav-link" href="/wordcloud_day">
-                        <div class="sb-nav-link-icon"><i class="fas fa-tachometer-alt"></i></div>
-                        wordcloud(day)
                     </a>
                     <!--                    <div class="sb-sidenav-menu-heading">Addons</div>-->
                     <!--                    <a class="nav-link" href="charts.html">-->
@@ -161,7 +161,7 @@
             <!--                </div>-->
 
             <div class="row">
-                <div class="card col-md-6" style="height:955px; overflow:auto">
+                <div class="card col-md-6" style="height:953px; width:3000px; overflow:auto">
                     <div class="card-header">
                         <i class="fas fa-table mr-1"></i>
                         hot keywords 100 ( {{week_ago}} ~ {{today}} )
@@ -222,29 +222,36 @@
                     </div>
                 </div>
             </div>
-            <div class="row" style="width:2600px; height:1000px;">
-                <div class="card mb-4" >
-                    <div class="card-header">
-                        <i class="fas fa-chart-bar mr-1"></i>
-                        today hot keywords
-                    </div>
-                    <div style="margin:auto" id="mynetwork"></div>
-                </div>
-            </div>
-        </main>
-                <footer class="py-4 bg-light mt-auto">
-                    <div class="container-fluid">
-                        <div class="d-flex align-items-center justify-content-between small">
-                            <div class="text-muted">Copyright &copy; Your Website 2020</div>
-                            <div>
-                                <a href="#">Privacy Policy</a>
-                                &middot;
-                                <a href="#">Terms &amp; Conditions</a>
-                            </div>
+            <div class="row">
+                <div class="col-md-5" style="width:100%">
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <i class="fas fa-chart-bar mr-1"></i>
+                             relation keyword
+                        </div>
+                        <div class="card-body">
+                            <div style="margin:auto" id="mynetwork"></div>
                         </div>
                     </div>
-                </footer>
+                </div>
+            </div>
+            <br>
+            <br>
+        </main>
     </div>
+    <!--        <footer class="py-4 bg-light mt-auto">-->
+    <!--            <div class="container-fluid">-->
+    <!--                <div class="d-flex align-items-center justify-content-between small">-->
+    <!--                    <div class="text-muted">Copyright &copy; Your Website 2020</div>-->
+    <!--                    <div>-->
+    <!--                        <a href="#">Privacy Policy</a>-->
+    <!--                        &middot;-->
+    <!--                        <a href="#">Terms &amp; Conditions</a>-->
+    <!--                    </div>-->
+    <!--                </div>-->
+    <!--            </div>-->
+    <!--        </footer>-->
+
 </div>
 
 
@@ -253,8 +260,8 @@
     var day_list = {{day_list | safe}}
     var day_count = {{day_count | safe}}
     var max_cnt = {{max_cnt | safe}}
-    var node_dataset = {{node_dataset | safe}}
-    var edge_dataset = {{edge_dataset | safe}}
+    var nodes = {{nodes | safe}}
+    var edges = {{edges | safe}}
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.8.0/Chart.min.js" crossorigin="anonymous"></script>
 <script src="./static/assets/demo/chart-network-demo.js"></script>
@@ -270,7 +277,7 @@ var min_ = null;
 var max_ = null;
 
 const xhr = new XMLHttpRequest();
-xhr.open('GET', '/week_keywords?keyword=' + t[0].innerText + '&?sv=' + search, true);
+xhr.open('GET', '/month_chart?keyword=' + t[0].innerText + '&?sv=' + search, true);
 xhr.send();
 
 xhr.onreadystatechange = function () {
@@ -281,7 +288,7 @@ xhr.onreadystatechange = function () {
     stock = jsonData.close
     max_ = jsonData.max_
     min_ = jsonData.min_
-    createChart(jsonData.week, jsonData.count, jsonData.close);
+    createChart(jsonData.month_date, jsonData.count, jsonData.close);
 
   } else {
     console.log(`[${xhr.status}] : ${xhr.statusText}`);
@@ -293,14 +300,14 @@ xhr.onreadystatechange = function () {
 
     t[i].addEventListener("click", function(key){
       const xhr = new XMLHttpRequest();
-      xhr.open('GET', '/week_keywords?keyword=' + key.currentTarget.innerText, true);
+      xhr.open('GET', '/month_chart?keyword=' + key.currentTarget.innerText, true);
       xhr.send();
       xhr.onreadystatechange = function () {
         if (xhr.readyState !== XMLHttpRequest.DONE) return;
         if (xhr.status === 200) {
           var jsonData = JSON.parse(xhr.responseText);
           data = jsonData.count
-          createChart(jsonData.week, jsonData.count, stock);
+          createChart(jsonData.month_date, jsonData.count, stock);
 
         } else {
           console.log(`[${xhr.status}] : ${xhr.statusText}`);
@@ -313,7 +320,7 @@ xhr.onreadystatechange = function () {
 function search(){
     var search = document.getElementById("search").value;
     const xhr = new XMLHttpRequest();
-    xhr.open('GET', '/week_keywords?sv=' + search + '&?keyword=' + t[1].innerText, true);
+    xhr.open('GET', '/month_chart?sv=' + search + '&?keyword=' + t[1].innerText, true);
     xhr.send();
     xhr.onreadystatechange = function () {
   if (xhr.readyState !== XMLHttpRequest.DONE) return;
@@ -322,7 +329,7 @@ function search(){
     stock = jsonData.close
     max_ = jsonData.max_
     min_ = jsonData.min_
-    createChart(jsonData.week, data, jsonData.close);
+    createChart(jsonData.month_date, data, jsonData.close);
 
   } else {
     console.log(`[${xhr.status}] : ${xhr.statusText}`);
