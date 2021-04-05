@@ -1,12 +1,7 @@
-import datetime
-from dateutil.relativedelta import  relativedelta
-
 import pymysql
-import pandas_datareader.data as web
-from wordcloud import WordCloud
-
 import matplotlib.font_manager as fm
 from matplotlib import rc
+
 
 class DatabaseConnect:
     def __enter__(self):

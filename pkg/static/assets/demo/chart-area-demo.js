@@ -45,6 +45,10 @@ var ctx = document.getElementById("myAreaChart");
     }],
   },
   options: {
+    title: {
+            display: true,
+            text: corp_name
+    },
     scales: {
       xAxes: [{
         time: {

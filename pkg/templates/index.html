@@ -27,7 +27,7 @@
 <body>
 <nav class="sb-topnav navbar navbar-expand navbar-dark bg-dark">
     <a class="navbar-brand" href="/">News Keywords</a>
-    <button class="btn btn-link btn-sm order-1 order-lg-0" id="sidebarToggle" href="#" style="padding: 15px 10px;"><i class="fas fa-bars"></i>
+    <button class="btn btn-link btn-sm order-1 order-lg-0" id="sidebarToggle" style="padding: 15px 10px;"><i class="fas fa-bars"></i>
     </button>
     <!-- Navbar Search-->
     <form class="d-none d-md-inline-block form-inline ml-auto mr-0 mr-md-3 my-2 my-md-0">
@@ -164,7 +164,7 @@
                 <div class="card col-md-6" style="height:953px; width:3000px; overflow:auto">
                     <div class="card-header">
                         <i class="fas fa-table mr-1"></i>
-                        hot keywords 100 ( {{week_ago}} ~ {{today}} )
+                        this month keywords 100
                     </div>
                     <div class="card-body">
                         <div class="table-responsive" >
@@ -195,7 +195,7 @@
                     <div class="card mb-4">
                         <div class="card-header">
                             <i class="fas fa-chart-area mr-1"></i>
-                            week keywords & stock price
+                            keyword count & stock price
                         </div>
                         <div class="row justify-content-end my-3" style="margin-right:10px">
                             <div class="col-3 input-group" >
@@ -214,7 +214,7 @@
                     <div class="card mb-4">
                         <div class="card-header">
                             <i class="fas fa-chart-bar mr-1"></i>
-                            today hot keywords
+                            this week keywords
                         </div>
                         <div class="card-body">
                             <canvas id="myBarChart" width="100%" height="40"></canvas>
@@ -288,6 +288,7 @@ xhr.onreadystatechange = function () {
     stock = jsonData.close
     max_ = jsonData.max_
     min_ = jsonData.min_
+    corp_name = jsonData.corp_name
     createChart(jsonData.month_date, jsonData.count, jsonData.close);
 
   } else {
@@ -307,6 +308,7 @@ xhr.onreadystatechange = function () {
         if (xhr.status === 200) {
           var jsonData = JSON.parse(xhr.responseText);
           data = jsonData.count
+          corp_name = jsonData.corp_name
           createChart(jsonData.month_date, jsonData.count, stock);
 
         } else {
@@ -329,6 +331,7 @@ function search(){
     stock = jsonData.close
     max_ = jsonData.max_
     min_ = jsonData.min_
+    corp_name = jsonData.corp_name
     createChart(jsonData.month_date, data, jsonData.close);
 
   } else {
@@ -339,12 +342,6 @@ function search(){
 
 
 </script>
-<script type=text/javascript>
-
-
-
-</script>
-
 <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.3/dist/js/bootstrap.bundle.min.js"
         crossorigin="anonymous"></script>

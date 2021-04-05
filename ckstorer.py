@@ -9,6 +9,7 @@ import pymysql
 
 HEADERS = {"User-Agent": 'Mozilla/5.0'}
 BASE_URL = 'https://kr.investing.com/news/economy'
+BASE_URL_US = 'https://www.investing.com/news/economy'
 temp_ = open('./prohibited_words.txt', 'r', encoding='utf-8')
 PROHIBITED_WORDS = temp_.readline().replace('\'', '').split(', ')
 
@@ -110,8 +111,8 @@ class CKStorer:
 
             temp = soup.find('div', class_='largeTitle')
             articles = temp.find_all('article', class_="js-article-item articleItem ")
-            print(articles)
             print(f'page: {idx} / {end}')
+
             for article in articles:
                 time.sleep(0.5)
                 title = article.find('a', class_='title').text
@@ -133,6 +134,7 @@ class CKStorer:
                 publish = article.find('span', class_='articleDetails').contents[0].string
                 content_url = BASE_URL + '/article-' + article_num
                 res = None
+
                 try:
                     res = requests.get(content_url, headers=HEADERS).text.encode('utf-8')
                 except requests.exceptions.HTTPError as ex:
@@ -148,6 +150,7 @@ class CKStorer:
                 content = re.sub(r'© Reuters\.s*', '', content)
                 content = content.replace(title, '').replace('\'', '').replace('\"', '')\
                                                     .replace('\t', ' ').replace('\n', ' ').strip()
+
                 email_pos = re.search(r'(\S+@\S+)', content)
                 if email_pos:
                     content = content[:email_pos.span()[0]]
@@ -275,71 +278,17 @@ class CKStorer:
                         vector_size=num_features,
                         min_count=min_word_count,
                         window=context,
-                        sample=downsampling)
+                        sample=downsampling,
+                        sg=0) # sg=0 -> CBOW, sg=1 -> Skip-gram
 
         model.init_sims(replace=True)
         model_name = 'trained_model'
         model.save(model_name)
 
 
-        # self.connect.select_db('default_db')
-        # self.cur.execute(f'''
-        # SELECT DISTINCT TB.article_content
-        # FROM default_tb TB, keyword K, keyword_detail KD
-        # WHERE TB.article_id = KD.article_id
-        # AND K.keyword_id = KD.keyword_id
-        # AND K.keyword_name LIKE '%{kw}%';
-        # ''')
-        #
-        # contents = list(self.cur.fetchall())
-        # komoran = Komoran()
-        #
-        # words_list = []
-        #
-        # for content in contents:
-        #     pos = komoran.nouns(content[0])
-        #     nnp = [string for string in pos if len(string) > 1]
-        #     words_list.append(nnp)
-        #
-        # num_features = 300
-        # min_word_count = 5
-        # num_workers = 4
-        # context = 10
-        # sampling = 1e-3
-        #
-        # from gensim.models import word2vec
-        #
-        # model = word2vec.Word2Vec(words_list,
-        #                           workers=num_workers,
-        #                           vector_size=num_features,
-        #                           min_count=min_word_count,
-        #                           window=context,
-        #                           sample=sampling,
-        #                           sg=0)
-        # model.init_sims(replace=True)
-        # model_name = 'cbow_text'
-        # model.save(model_name)
-        #
-        # print('CBOW : ', model.wv.most_similar(kw))
-        #
-        # return model
-
-        # model = word2vec.Word2Vec(words_list,
-        #                           workers=num_workers,
-        #                           vector_size=num_features,
-        #                           min_count=min_word_count,
-        #                           window=context,
-        #                           sample=sampling,
-        #                           sg=1)
-        # model.init_sims(replace=True)
-        # model_name = 'skip_gram_text'
-        # model.save(model_name)
-        #
-        # print('Skip-gram : ', model.wv.most_similar(kw))
-
 if __name__ == '__main__':
-    test = CKStorer()
+    test = CKStorer('test_db', 'test_tb')
     with test as t:
-        t.run(1, 100)
+        t.run(1, 10)
 
     # test.relation_keyword()
