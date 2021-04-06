@@ -287,8 +287,8 @@ class CKStorer:
 
 
 if __name__ == '__main__':
-    test = CKStorer('test_db', 'test_tb')
+    test = CKStorer()
     with test as t:
-        t.run(1, 10)
+        t.run(1, 3)
 
     # test.relation_keyword()

@@ -44,8 +44,7 @@ def month_chart():
         tmp = dict(zip(corp_info.values(), corp_info.keys()))
         if stock in tmp:
             corp_name = tmp[stock]
-    print(corp_name)
-    print(stock)
+
     df = web.DataReader(stock, 'naver', month_date[0], month_date[-1])
     df = df.Close.asfreq(freq='D', method='bfill')
     count = kd.get_day_by_day_count(keyword, df.index)

@@ -71,7 +71,7 @@ var ctx = document.getElementById("myAreaChart");
         },
         ticks: {
           min: 0,
-          max: 75,
+          max: 50,
           maxTicksLimit: 5
         },
         gridLines: {

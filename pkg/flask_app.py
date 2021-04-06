@@ -7,21 +7,34 @@ import pandas_datareader.data as web
 from wordcloud import WordCloud
 
 import keyword_data as kd
+import keyword_data_us as kdu
 
 
 app = Flask(__name__, template_folder='templates')
 corp_info = pd.read_csv('./corp_name_code.csv', sep=',', header=None, dtype={'code': object})
 corp_info = dict(corp_info.values)
 
-@app.route('/')
-def index():
-    table = enumerate(kd.get_month_keyword(), 1)
-    nodes, edges = kd.keyword_network(['삼성전자', '현대차', '기아', '카카오', '네이버', '코로나'])
-    day_list, day_count = kd.get_week_list()
-    max_cnt = (max(day_count)//10)*10 + 10
 
-    return render_template('index.html', table=table, nodes=nodes, edges=edges,
-                           day_count=list(day_count), day_list=list(day_list), max_cnt=max_cnt)
+@app.route('/us', endpoint='us')
+@app.route('/kr', endpoint='kr')
+@app.route('/', endpoint='kr')
+def index():
+    if request.endpoint == 'kr':
+        table = enumerate(kd.get_month_keyword(), 1)
+        nodes, edges = kd.keyword_network(['삼성전자', '현대차', '기아', '카카오', '네이버', '코로나'])
+        day_list, day_count = kd.get_week_list()
+        max_cnt = (max(day_count)//10)*10 + 10
+
+        return render_template('index.html', table=table, nodes=nodes, edges=edges,
+                               day_count=list(day_count), day_list=list(day_list), max_cnt=max_cnt)
+    else:
+        table = enumerate(kdu.get_month_keyword(), 1)
+        nodes, edges = kdu.keyword_network(['covid-19', 'biden', 'tesla', 'nyse', 'china', 'trump'])
+        day_list, day_count = kdu.get_week_list()
+        max_cnt = (max(day_count)//10)*10 + 10
+
+        return render_template('index.html', table=table, nodes=nodes, edges=edges,
+                               day_count=list(day_count), day_list=list(day_list), max_cnt=max_cnt)
 
 
 @app.route('/month_chart')
@@ -30,7 +43,6 @@ def month_chart():
     keyword = request.args.get('keyword')
     now = datetime.datetime.now()
     month_date = [(now - datetime.timedelta(days=x)).strftime('%Y-%m-%d') for x in reversed(range(1, 31))]
-    corp_name = '삼성전자'
 
     if any(s.isalpha() for s in stock):
         try:
